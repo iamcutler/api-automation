@@ -1,0 +1,28 @@
+{
+  "name": "api-automation",
+  "version": "1.0.0",
+  "description": "Test suite for server / api level automated testing",
+  "main": "test.js",
+  "scripts": {
+    "automation": "./node_modules/mocha/bin/mocha run.js --reporter mochawesome --reporter-options reportDir=report,reportFilename=report",
+    "test": "./node_modules/mocha/bin/mocha tests/**/*.test.js"
+  },
+  "author": "",
+  "engines": {
+    "node": "8.11.3"
+  },
+  "license": "ISC",
+  "devDependencies": {
+    "sinon": "^6.1.0"
+  },
+  "dependencies": {
+    "assert": "^1.4.1",
+    "bluebird": "^3.5.1",
+    "is-my-json-valid": "^2.17.2",
+    "it-each": "^0.3.1",
+    "mocha": "^5.2.0",
+    "mochawesome": "^3.0.2",
+    "request": "^2.87.0",
+    "xlsx": "^0.13.0"
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "id": "authentication",
+  "type": "object",
+  "definitions": {},
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "properties": {
+    "token": {
+      "type": "string",
+      "examples": [
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlcyI6IkJhc2ljLElRQm90U2VydmljZXMifQ==.w9N_qinECrFMrjDzyDSSXb18mrsItnrUEEwPI4xpkkk="
+      ]
+    },
+    "user": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "any"
+        },
+        "name": {
+          "type": "string"
+        },
+        "roles": {
+          "type": "array",
+          "examples": [
+            "Basic", "Services"
+          ]
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "token",
+    "user"
+  ]
+}
