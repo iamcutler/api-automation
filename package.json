@@ -5,7 +5,9 @@
   "main": "test.js",
   "scripts": {
     "automation": "./node_modules/mocha/bin/mocha run.js --reporter mochawesome --reporter-options reportDir=report,reportFilename=report",
-    "test": "./node_modules/mocha/bin/mocha tests/**/*.test.js"
+    "test": "./node_modules/mocha/bin/mocha tests/**/*.test.js",
+    "restore_test_data": "echo 'Setup script based on your DB'",
+    "generate:xlsx-diff": "node scripts/generate_xlsx_diff.js && git add ./xlsx_diff.json"
   },
   "author": "",
   "engines": {

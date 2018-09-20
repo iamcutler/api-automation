@@ -3,11 +3,13 @@ const fs = require('fs');
 const apiUtils = require('../utils');
 const sinon = require('sinon');
 const xlsx = require('xlsx');
+const child_process = require('child_process');
 const sandbox = sinon.createSandbox();
 
 describe('Utils', () => {
     beforeEach(() => {
         sandbox.stub(fs, 'readFile');
+        sandbox.stub(child_process, 'exec');
     });
 
     afterEach(() => {
@@ -15,7 +17,7 @@ describe('Utils', () => {
     });
 
     const configuration = {
-        patient_tokens: [{
+        tokens: [{
             access_token: '345645567756567567657567',
         }],
     };
@@ -27,21 +29,21 @@ describe('Utils', () => {
             // given
             const api = {
                 headers: `
-                    content_type=application/json,
+                    content-type=application/json,
                     username=services
                 `,
             };
             // when
             const result = apiUtils.setHeaders(api, configuration);
             // then
-            assert.equal(result['content-type'], api.header_content_type);
+            assert.equal(result['content-type'], 'application/json');
         });
 
         it('should set the X-Access-Token header if present', () => {
             // given
             const api = {
                 headers: `
-                    content_type=application/json,
+                    content-type=application/json,
                     username=services,
                     x-access-token=5467567865586876587567
                 `,
@@ -57,9 +59,9 @@ describe('Utils', () => {
         it('should return a configuration value if found in value string', () => {
             // given
             // when
-            const result = apiUtils.getConfigValueFromSheet('db.patient_tokens.0.access_token', configuration);
+            const result = apiUtils.getConfigValueFromSheet('db.tokens.0.access_token', configuration);
             // then
-            assert.equal(result, configuration.patient_tokens[0].access_token);
+            assert.equal(result, configuration.tokens[0].access_token);
         });
     });
 
@@ -88,8 +90,9 @@ describe('Utils', () => {
                     testing: 'Hello World'
                 }
             };
+            const schemaName = 'testing';
             // when
-            apiUtils.validateAPIResponse('/schemas/testing.json', response)
+            apiUtils.validateAPIResponse(schemaName, response)
                 .then((result) => {
                     // then
                     assert.deepEqual(result, []);
@@ -119,8 +122,9 @@ describe('Utils', () => {
             const response = {
                 test: {}
             };
+            const schemaName = 'testing';
             // when
-            apiUtils.validateAPIResponse('/schemas/testing.json', response)
+            apiUtils.validateAPIResponse(schemaName, response)
                 .then((result) => {
                     // then
                     assert.deepEqual(result, [{ field: 'data.test.testing',
@@ -135,19 +139,61 @@ describe('Utils', () => {
     });
 
     describe('method: getJSONPayloadData', () => {
-        it('should return json data from a payload file', (done) => {
+        // given
+        const payload = {
+            "user_id": "db.user.id",
+            "timestamp": 1460043522252,
+            "type": "test",
+            "test": "db.user.name"
+        };
+        const configuration = {
+            user: {
+                id: '345765675678678',
+                name: 'John Doe'
+            },
+        };
+
+        it('should return json data from a payload file with single level dynamic values', (done) => {
             // given
-            const payload = {
-                test: 'Hello World',
-            };
             fs.readFile.yields(null, {
                 toString: () => JSON.stringify(payload),
             });
             // when
-            apiUtils.getJSONPayloadData('test_data')
+            apiUtils.getJSONPayloadData(configuration, payload)
                 .then((result) => {
                     // then
-                    assert.deepEqual(result, payload);
+                    assert.deepEqual(result, {
+                        "user_id": configuration.user.id,
+                        "timestamp": payload.timestamp,
+                        "type": payload.type,
+                        "test": configuration.user.name
+                    });
+                    done();
+                });
+        });
+
+        it('should return json data from a payload file with multiple level(s) dynamic values', (done) => {
+            // given
+            const payload2 = Object.assign({}, payload, {
+                "test": {
+                    "name": "db.user.name",
+                },
+            });
+            fs.readFile.yields(null, {
+                toString: () => JSON.stringify(payload2),
+            });
+            // when
+            apiUtils.getJSONPayloadData(configuration, payload2)
+                .then((result) => {
+                    // then
+                    assert.deepEqual(result, {
+                        "user_id": configuration.user.id,
+                        "timestamp": payload.timestamp,
+                        "type": payload.type,
+                        "test": {
+                            "name": configuration.user.name,
+                        },
+                    });
                     done();
                 });
         });
@@ -157,7 +203,7 @@ describe('Utils', () => {
             const error = new Error('No such file or directory');
             fs.readFile.yields(error);
             // when
-            apiUtils.getJSONPayloadData('test_data')
+            apiUtils.getJSONPayloadData()
                 .catch((err) => {
                     // then
                     assert.equal(err.message, error.message);
@@ -198,6 +244,75 @@ describe('Utils', () => {
                 server_url: 'http://localhost:4000',
                 test: 'testing',
             });
+        });
+    });
+
+    describe('method: restoreTestData', () => {
+        it('should execute the expected command', () => {
+            // given
+            // when
+            apiUtils.restoreTestData();
+            // then
+            assert(child_process.exec.calledWith('yarn restore_test_data'));
+        });
+
+        it('should reject if an error occurred', (done) => {
+            // given
+            const error = new Error('Something went wrong');
+            child_process.exec.yields(error);
+            // when
+            apiUtils.restoreTestData()
+                .catch((err) => {
+                    assert.equal(err.message, error.message);
+                    done();
+                });
+        });
+    });
+
+    describe('method: constructRequestUrl', () => {
+        it('should inject dynamic config into a URL', () => {
+            // given
+            const config = {
+                server_url: 'http://localhost:4000',
+                user: {
+                    id: '4565676784353456567',
+                },
+            };
+            const url = '/api/v1/test/{db.user.id}';
+            // when
+            const result = apiUtils.constructRequestUrl(url, config);
+            // then
+            assert.equal(result, `${config.server_url}/api/v1/test/${config.user.id}`);
+        });
+
+        it('should inject dynamic config into a URL with multiple dynamic values', () => {
+            // given
+            const config = {
+                server_url: 'http://localhost:4000',
+                user: {
+                    id: '4565676784353456567',
+                },
+                user2: {
+                    id: '34557667867823434232',
+                },
+            };
+            const url = '/api/v1/test/{db.user.id}/{db.user2.id}';
+            // when
+            const result = apiUtils.constructRequestUrl(url, config);
+            // then
+            assert.equal(result, `${config.server_url}/api/v1/test/${config.user.id}/${config.user2.id}`);
+        });
+
+        it('should pass back non-dynamic URL', () => {
+            // given
+            const config = {
+                server_url: 'http://localhost:4000',
+            };
+            const url = '/api/v1/test';
+            // when
+            const result = apiUtils.constructRequestUrl(url, config);
+            // then
+            assert.equal(result, `${config.server_url}${url}`);
         });
     });
 });
